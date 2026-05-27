@@ -1,53 +1,86 @@
 from flask import Flask
 from threading import Thread
 import os
+import math
+
+from pyrogram import Client, filters
+from pyrogram.types import (
+    InlineKeyboardMarkup,
+    InlineKeyboardButton
+)
+
+from config import *
+
+# =========================================================
+# WEB SERVER FOR RENDER WEB SERVICE
+# =========================================================
 
 web_app = Flask(__name__)
 
 @web_app.route("/")
 def home():
-    return "Bot Running Successfully"
+    return "Professional Calculator Bot Is Running Successfully"
 
 def run_web():
     port = int(os.environ.get("PORT", 10000))
     web_app.run(host="0.0.0.0", port=port)
 
-Thread(target=run_web).start()
-from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from config import *
-import os
+Thread(target=run_web, daemon=True).start()
+
+# =========================================================
+# TELEGRAM BOT CLIENT
+# =========================================================
 
 app = Client(
-    "CalculatorBot",
+    "ProfessionalCalculatorBot",
     api_id=API_ID,
     api_hash=API_HASH,
     bot_token=BOT_TOKEN
 )
 
-users_file = "users.txt"
+# =========================================================
+# CONFIG
+# =========================================================
 
-if not os.path.exists(users_file):
-    open(users_file, "w").close()
+START_IMAGE = "https://files.catbox.moe/splh4m.jpg"
 
+USERS_FILE = "users.txt"
+
+if not os.path.exists(USERS_FILE):
+    open(USERS_FILE, "w").close()
+
+user_data = {}
+
+# =========================================================
+# SAVE USERS
+# =========================================================
 
 def save_user(user_id):
-    with open(users_file, "r") as f:
-        users = f.read().splitlines()
+
+    with open(USERS_FILE, "r") as file:
+        users = file.read().splitlines()
 
     if str(user_id) not in users:
-        with open(users_file, "a") as f:
-            f.write(f"{user_id}\n")
+        with open(USERS_FILE, "a") as file:
+            file.write(f"{user_id}\n")
 
+# =========================================================
+# FORCE JOIN CHECK
+# =========================================================
 
 async def check_force_join(client, user_id):
+
     try:
         await client.get_chat_member(FORCE_CHANNEL, user_id)
         await client.get_chat_member(FORCE_GROUP, user_id)
         return True
+
     except:
         return False
 
+# =========================================================
+# CALCULATOR BUTTONS
+# =========================================================
 
 calculator_buttons = InlineKeyboardMarkup(
     [
@@ -67,7 +100,7 @@ calculator_buttons = InlineKeyboardMarkup(
             InlineKeyboardButton("1", callback_data="1"),
             InlineKeyboardButton("2", callback_data="2"),
             InlineKeyboardButton("3", callback_data="3"),
-            InlineKeyboardButton("-", callback_data="-")
+            InlineKeyboardButton("−", callback_data="-")
         ],
         [
             InlineKeyboardButton("0", callback_data="0"),
@@ -76,24 +109,28 @@ calculator_buttons = InlineKeyboardMarkup(
             InlineKeyboardButton("+", callback_data="+")
         ],
         [
-            InlineKeyboardButton("Clear", callback_data="clear")
+            InlineKeyboardButton("🗑 Clear", callback_data="clear")
         ]
     ]
 )
 
-user_data = {}
-
+# =========================================================
+# START COMMAND
+# =========================================================
 
 @app.on_message(filters.command("start"))
 async def start_command(client, message):
+
     user_id = message.from_user.id
+
     save_user(user_id)
 
     joined = await check_force_join(client, user_id)
 
-    START_IMAGE = "https://files.catbox.moe/splh4m.jpg"
+    # ================= FORCE JOIN ================= #
 
     if not joined:
+
         buttons = InlineKeyboardMarkup(
             [
                 [
@@ -110,7 +147,7 @@ async def start_command(client, message):
                 ],
                 [
                     InlineKeyboardButton(
-                        "✅ Check Join",
+                        "✅ Verify Join",
                         callback_data="check_join"
                     )
                 ]
@@ -120,40 +157,57 @@ async def start_command(client, message):
         return await message.reply_photo(
             photo=START_IMAGE,
             caption=(
-                "✨ Welcome To Professional Calculator Bot\n\n"
-                "⚠️ To Use This Bot Please Join Our Official Channel & Group First."
+                "✨ **Welcome To Professional Calculator Bot**\n\n"
+                "⚠️ To Continue Using This Bot,\n"
+                "Please Join Our Official Channel & Group First."
             ),
             reply_markup=buttons
         )
 
+    # ================= MAIN MENU ================= #
+
     await message.reply_photo(
         photo=START_IMAGE,
         caption=(
-            "✨ Professional Calculator Bot Ready\n\n"
-            "Use The Buttons Below 👇"
+            "✨ **Professional Calculator Bot Activated**\n\n"
+            "🧮 Fast • Stylish • Advanced Calculator\n\n"
+            "👇 Use Buttons Below"
         ),
         reply_markup=calculator_buttons
     )
+
+# =========================================================
+# FORCE JOIN VERIFY
+# =========================================================
+
 @app.on_callback_query(filters.regex("check_join"))
-async def check_join_callback(client, callback_query):
+async def verify_join(client, callback_query):
+
     user_id = callback_query.from_user.id
 
     joined = await check_force_join(client, user_id)
 
     if not joined:
         return await callback_query.answer(
-            "Join Channel & Group First",
+            "❌ Please Join Channel & Group First",
             show_alert=True
         )
 
-    await callback_query.message.edit_text(
-        "✨ Access Granted\n\nCalculator Ready 👇",
+    await callback_query.message.edit_caption(
+        caption=(
+            "✅ **Verification Successful**\n\n"
+            "🧮 Calculator Ready To Use"
+        ),
         reply_markup=calculator_buttons
     )
 
+# =========================================================
+# CALCULATOR SYSTEM
+# =========================================================
 
 @app.on_callback_query()
-async def calculator(client, callback_query):
+async def calculator_system(client, callback_query):
+
     data = callback_query.data
     user_id = callback_query.from_user.id
 
@@ -165,15 +219,23 @@ async def calculator(client, callback_query):
 
     expression = user_data[user_id]
 
+    # ================= CLEAR ================= #
+
     if data == "clear":
         expression = ""
 
+    # ================= RESULT ================= #
+
     elif data == "=":
+
         try:
             result = str(eval(expression))
             expression = result
+
         except:
             expression = "Error"
+
+    # ================= INPUT ================= #
 
     else:
         expression += data
@@ -181,52 +243,72 @@ async def calculator(client, callback_query):
     user_data[user_id] = expression
 
     try:
-        await callback_query.message.edit_text(
-            f"```{expression}```",
+        await callback_query.message.edit_caption(
+            caption=(
+                "🧮 **Professional Calculator**\n\n"
+                f"`{expression}`"
+            ),
             reply_markup=calculator_buttons
         )
+
     except:
         pass
 
+# =========================================================
+# BROADCAST SYSTEM
+# =========================================================
 
 @app.on_message(filters.command("broadcast") & filters.user(OWNER_ID))
-async def broadcast(client, message):
+async def broadcast_message(client, message):
+
     if not message.reply_to_message:
         return await message.reply_text(
-            "Reply To Any Message To Broadcast"
+            "❌ Reply To Any Message To Broadcast"
         )
 
-    with open(users_file, "r") as f:
-        users = f.read().splitlines()
+    with open(USERS_FILE, "r") as file:
+        users = file.read().splitlines()
 
     success = 0
     failed = 0
 
-    status = await message.reply_text("Broadcast Started...")
+    progress = await message.reply_text(
+        "📢 Broadcasting Message To Users..."
+    )
 
     for user in users:
+
         try:
             await message.reply_to_message.copy(int(user))
             success += 1
+
         except:
             failed += 1
 
-    await status.edit_text(
-        f"✅ Broadcast Completed\n\n"
-        f"Success: {success}\n"
-        f"Failed: {failed}"
+    await progress.edit_text(
+        "✅ Broadcast Completed\n\n"
+        f"✔ Success : {success}\n"
+        f"❌ Failed : {failed}"
     )
 
+# =========================================================
+# USERS COUNT
+# =========================================================
 
 @app.on_message(filters.command("users") & filters.user(OWNER_ID))
 async def users_count(client, message):
-    with open(users_file, "r") as f:
-        users = f.read().splitlines()
+
+    with open(USERS_FILE, "r") as file:
+        users = file.read().splitlines()
 
     await message.reply_text(
-        f"👥 Total Users: {len(users)}"
+        f"👥 Total Bot Users : {len(users)}"
     )
 
+# =========================================================
+# BOT START
+# =========================================================
 
-print("Bot Started...")
+print("Professional Calculator Bot Started Successfully")
+
 app.run()
