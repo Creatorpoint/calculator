@@ -105,10 +105,9 @@ async def start_command(client, message):
         return await message.reply_photo(
             photo=START_IMAGE,
             caption=(
-                "✨ Welcome To Professional Calculator Bot
-
-"
-                "⚠️ To Use This Bot Please Join Our Official Channel & Group First."
+    "✨ Welcome To Prime Calculator Bot\n\n"
+    "⚠️ To Use This Bot Please Join Our Official Channel & Group First."
+),
             ),
             reply_markup=buttons
         )
@@ -116,11 +115,9 @@ async def start_command(client, message):
     await message.reply_photo(
         photo=START_IMAGE,
         caption=(
-            "✨Calculator Bot Ready
-
-"
-            "Use The Buttons Below 👇"
-        ),
+    "✨ Prime Calculator Bot Ready\n\n"
+    "Use The Buttons Below 👇"
+),
         reply_markup=calculator_buttons
     )
 
