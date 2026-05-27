@@ -2,10 +2,10 @@ import asyncio
 
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
+
 from flask import Flask
 from threading import Thread
 import os
-import math
 
 from pyrogram import Client, filters
 from pyrogram.types import (
@@ -16,14 +16,14 @@ from pyrogram.types import (
 from config import *
 
 # =========================================================
-# WEB SERVER FOR RENDER WEB SERVICE
+# WEB SERVER FOR RENDER
 # =========================================================
 
 web_app = Flask(__name__)
 
 @web_app.route("/")
 def home():
-    return "Professional Calculator Bot Is Running Successfully"
+    return "Professional Calculator Bot Running Successfully"
 
 def run_web():
     port = int(os.environ.get("PORT", 10000))
@@ -32,14 +32,16 @@ def run_web():
 Thread(target=run_web, daemon=True).start()
 
 # =========================================================
-# TELEGRAM BOT CLIENT
+# TELEGRAM BOT
 # =========================================================
 
 app = Client(
     "ProfessionalCalculatorBot",
     api_id=API_ID,
     api_hash=API_HASH,
-    bot_token=BOT_TOKEN
+    bot_token=BOT_TOKEN,
+    workers=100,
+    sleep_threshold=30
 )
 
 # =========================================================
@@ -56,7 +58,7 @@ if not os.path.exists(USERS_FILE):
 user_data = {}
 
 # =========================================================
-# SAVE USERS
+# SAVE USER
 # =========================================================
 
 def save_user(user_id):
@@ -75,45 +77,65 @@ def save_user(user_id):
 async def check_force_join(client, user_id):
 
     try:
-        await client.get_chat_member(FORCE_CHANNEL, user_id)
-        await client.get_chat_member(FORCE_GROUP, user_id)
+
+        channel = await client.get_chat_member(
+            FORCE_CHANNEL,
+            user_id
+        )
+
+        group = await client.get_chat_member(
+            FORCE_GROUP,
+            user_id
+        )
+
+        if channel.status in ["left", "kicked"]:
+            return False
+
+        if group.status in ["left", "kicked"]:
+            return False
+
         return True
 
     except:
         return False
 
 # =========================================================
-# CALCULATOR BUTTONS
+# PROFESSIONAL BUTTONS
 # =========================================================
 
 calculator_buttons = InlineKeyboardMarkup(
     [
         [
+            InlineKeyboardButton("➕", callback_data="+"),
+            InlineKeyboardButton("➖", callback_data="-"),
+            InlineKeyboardButton("✖️", callback_data="*"),
+            InlineKeyboardButton("➗", callback_data="/")
+        ],
+        [
             InlineKeyboardButton("7", callback_data="7"),
             InlineKeyboardButton("8", callback_data="8"),
-            InlineKeyboardButton("9", callback_data="9"),
-            InlineKeyboardButton("÷", callback_data="/")
+            InlineKeyboardButton("9", callback_data="9")
         ],
         [
             InlineKeyboardButton("4", callback_data="4"),
             InlineKeyboardButton("5", callback_data="5"),
-            InlineKeyboardButton("6", callback_data="6"),
-            InlineKeyboardButton("×", callback_data="*")
+            InlineKeyboardButton("6", callback_data="6")
         ],
         [
             InlineKeyboardButton("1", callback_data="1"),
             InlineKeyboardButton("2", callback_data="2"),
-            InlineKeyboardButton("3", callback_data="3"),
-            InlineKeyboardButton("−", callback_data="-")
+            InlineKeyboardButton("3", callback_data="3")
         ],
         [
-            InlineKeyboardButton("0", callback_data="0"),
             InlineKeyboardButton(".", callback_data="."),
-            InlineKeyboardButton("=", callback_data="="),
-            InlineKeyboardButton("+", callback_data="+")
+            InlineKeyboardButton("0", callback_data="0"),
+            InlineKeyboardButton("=", callback_data="=")
         ],
         [
-            InlineKeyboardButton("🗑 Clear", callback_data="clear")
+            InlineKeyboardButton(
+                "🗑 Clear",
+                callback_data="clear"
+            )
         ]
     ]
 )
@@ -162,8 +184,8 @@ async def start_command(client, message):
             photo=START_IMAGE,
             caption=(
                 "✨ **Welcome To Professional Calculator Bot**\n\n"
-                "⚠️ To Continue Using This Bot,\n"
-                "Please Join Our Official Channel & Group First."
+                "⚠️ To Use This Bot,\n"
+                "Please Join Our Official Channel & Group."
             ),
             reply_markup=buttons
         )
@@ -173,15 +195,17 @@ async def start_command(client, message):
     await message.reply_photo(
         photo=START_IMAGE,
         caption=(
-            "✨ **Professional Calculator Bot Activated**\n\n"
-            "🧮 Fast • Stylish • Advanced Calculator\n\n"
+            "✨ **Professional Calculator Activated**\n\n"
+            "⚡ Fast Response\n"
+            "🧮 Advanced Calculator\n"
+            "👥 Group Support Enabled\n\n"
             "👇 Use Buttons Below"
         ),
         reply_markup=calculator_buttons
     )
 
 # =========================================================
-# FORCE JOIN VERIFY
+# VERIFY JOIN
 # =========================================================
 
 @app.on_callback_query(filters.regex("check_join"))
@@ -192,8 +216,9 @@ async def verify_join(client, callback_query):
     joined = await check_force_join(client, user_id)
 
     if not joined:
+
         return await callback_query.answer(
-            "❌ Please Join Channel & Group First",
+            "❌ Join Channel & Group First",
             show_alert=True
         )
 
@@ -206,17 +231,18 @@ async def verify_join(client, callback_query):
     )
 
 # =========================================================
-# CALCULATOR SYSTEM
+# BUTTON CALCULATOR
 # =========================================================
 
 @app.on_callback_query()
-async def calculator_system(client, callback_query):
+async def calculator(client, callback_query):
 
     data = callback_query.data
-    user_id = callback_query.from_user.id
 
     if data == "check_join":
         return
+
+    user_id = callback_query.from_user.id
 
     if user_id not in user_data:
         user_data[user_id] = ""
@@ -233,7 +259,7 @@ async def calculator_system(client, callback_query):
     elif data == "=":
 
         try:
-            result = str(eval(expression))
+            result = f"{eval(expression):,}"
             expression = result
 
         except:
@@ -247,6 +273,7 @@ async def calculator_system(client, callback_query):
     user_data[user_id] = expression
 
     try:
+
         await callback_query.message.edit_caption(
             caption=(
                 "🧮 **Professional Calculator**\n\n"
@@ -259,13 +286,51 @@ async def calculator_system(client, callback_query):
         pass
 
 # =========================================================
+# GROUP & PRIVATE TEXT CALCULATOR
+# =========================================================
+
+@app.on_message(
+    filters.text &
+    ~filters.command(
+        ["start", "broadcast", "users"]
+    )
+)
+async def text_calculator(client, message):
+
+    try:
+
+        text = message.text.strip()
+
+        allowed = "0123456789+-*/().% "
+
+        for char in text:
+
+            if char not in allowed:
+                return
+
+        result = eval(text)
+
+        await message.reply_text(
+            "🧮 **Calculator Result**\n\n"
+            f"📥 Expression : `{text}`\n"
+            f"📤 Result : `{result}`"
+        )
+
+    except:
+        pass
+
+# =========================================================
 # BROADCAST SYSTEM
 # =========================================================
 
-@app.on_message(filters.command("broadcast") & filters.user(OWNER_ID))
+@app.on_message(
+    filters.command("broadcast") &
+    filters.user(OWNER_ID)
+)
 async def broadcast_message(client, message):
 
     if not message.reply_to_message:
+
         return await message.reply_text(
             "❌ Reply To Any Message To Broadcast"
         )
@@ -277,13 +342,17 @@ async def broadcast_message(client, message):
     failed = 0
 
     progress = await message.reply_text(
-        "📢 Broadcasting Message To Users..."
+        "📢 Broadcasting Message..."
     )
 
     for user in users:
 
         try:
-            await message.reply_to_message.copy(int(user))
+
+            await message.reply_to_message.copy(
+                int(user)
+            )
+
             success += 1
 
         except:
@@ -299,14 +368,36 @@ async def broadcast_message(client, message):
 # USERS COUNT
 # =========================================================
 
-@app.on_message(filters.command("users") & filters.user(OWNER_ID))
+@app.on_message(
+    filters.command("users") &
+    filters.user(OWNER_ID)
+)
 async def users_count(client, message):
 
     with open(USERS_FILE, "r") as file:
         users = file.read().splitlines()
 
     await message.reply_text(
-        f"👥 Total Bot Users : {len(users)}"
+        f"👥 Total Users : {len(users)}"
+    )
+
+# =========================================================
+# HELP COMMAND
+# =========================================================
+
+@app.on_message(filters.command("help"))
+async def help_command(client, message):
+
+    await message.reply_text(
+        "📚 **Bot Commands**\n\n"
+        "/start - Start Bot\n"
+        "/help - Help Menu\n"
+        "/users - Total Users\n"
+        "/broadcast - Broadcast Message\n\n"
+        "🧮 Send Any Math Expression:\n"
+        "`5+5`\n"
+        "`100/5`\n"
+        "`8*7`"
     )
 
 # =========================================================
