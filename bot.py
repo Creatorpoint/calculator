@@ -1,11 +1,18 @@
 import asyncio
+import os
+from flask import Flask
+from threading import Thread
+
+# =========================================================
+# FIX PYTHON 3.14 PYROGRAM ERROR
+# =========================================================
 
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
 
-from flask import Flask
-from threading import Thread
-import os
+# =========================================================
+# IMPORTS
+# =========================================================
 
 from pyrogram import Client, filters
 from pyrogram.types import (
@@ -19,36 +26,34 @@ from config import *
 # WEB SERVER FOR RENDER
 # =========================================================
 
-web_app = Flask(__name__)
+web = Flask(__name__)
 
-@web_app.route("/")
+@web.route("/")
 def home():
     return "Prime Calculator Bot Running Successfully"
 
 def run_web():
     port = int(os.environ.get("PORT", 10000))
-    web_app.run(host="0.0.0.0", port=port)
+    web.run(host="0.0.0.0", port=port)
 
 Thread(target=run_web, daemon=True).start()
 
 # =========================================================
-# TELEGRAM BOT CLIENT
+# BOT CLIENT
 # =========================================================
 
 app = Client(
-    "PrimeCalculatorBot",
+    "PrimeCalculator",
     api_id=API_ID,
     api_hash=API_HASH,
     bot_token=BOT_TOKEN,
-    workers=100,
+    workers=200,
     sleep_threshold=30
 )
 
 # =========================================================
-# CONFIG
+# FILES
 # =========================================================
-
-START_IMAGE = "https://files.catbox.moe/splh4m.jpg"
 
 USERS_FILE = "users.txt"
 GROUPS_FILE = "groups.txt"
@@ -59,7 +64,17 @@ if not os.path.exists(USERS_FILE):
 if not os.path.exists(GROUPS_FILE):
     open(GROUPS_FILE, "w").close()
 
-user_data = {}
+# =========================================================
+# START IMAGE
+# =========================================================
+
+START_IMAGE = "https://files.catbox.moe/splh4m.jpg"
+
+# =========================================================
+# USER DATA
+# =========================================================
+
+calculator_data = {}
 
 # =========================================================
 # SAVE USER
@@ -67,13 +82,15 @@ user_data = {}
 
 def save_user(user_id):
 
-    with open(USERS_FILE, "r") as file:
-        users = file.read().splitlines()
+    user_id = str(user_id)
 
-    if str(user_id) not in users:
+    with open(USERS_FILE, "r") as f:
+        users = f.read().splitlines()
 
-        with open(USERS_FILE, "a") as file:
-            file.write(f"{user_id}\n")
+    if user_id not in users:
+
+        with open(USERS_FILE, "a") as f:
+            f.write(user_id + "\n")
 
 # =========================================================
 # SAVE GROUP
@@ -81,37 +98,29 @@ def save_user(user_id):
 
 def save_group(group_id):
 
-    with open(GROUPS_FILE, "r") as file:
-        groups = file.read().splitlines()
+    group_id = str(group_id)
 
-    if str(group_id) not in groups:
+    with open(GROUPS_FILE, "r") as f:
+        groups = f.read().splitlines()
 
-        with open(GROUPS_FILE, "a") as file:
-            file.write(f"{group_id}\n")
+    if group_id not in groups:
+
+        with open(GROUPS_FILE, "a") as f:
+            f.write(group_id + "\n")
 
 # =========================================================
 # FORCE JOIN CHECK
 # =========================================================
 
-async def check_force_join(client, user_id):
+async def check_force_join(user_id):
 
     try:
-
-        await client.get_chat_member(
-            FORCE_CHANNEL,
-            user_id
-        )
-
+        await app.get_chat_member(FORCE_CHANNEL, user_id)
     except:
         return False
 
     try:
-
-        await client.get_chat_member(
-            FORCE_GROUP,
-            user_id
-        )
-
+        await app.get_chat_member(FORCE_GROUP, user_id)
     except:
         return False
 
@@ -124,36 +133,31 @@ async def check_force_join(client, user_id):
 calculator_buttons = InlineKeyboardMarkup(
     [
         [
-            InlineKeyboardButton("➕", callback_data="+"),
-            InlineKeyboardButton("➖", callback_data="-"),
-            InlineKeyboardButton("✖️", callback_data="*"),
-            InlineKeyboardButton("➗", callback_data="/")
-        ],
-        [
             InlineKeyboardButton("7", callback_data="7"),
             InlineKeyboardButton("8", callback_data="8"),
-            InlineKeyboardButton("9", callback_data="9")
+            InlineKeyboardButton("9", callback_data="9"),
+            InlineKeyboardButton("➗", callback_data="/")
         ],
         [
             InlineKeyboardButton("4", callback_data="4"),
             InlineKeyboardButton("5", callback_data="5"),
-            InlineKeyboardButton("6", callback_data="6")
+            InlineKeyboardButton("6", callback_data="6"),
+            InlineKeyboardButton("✖️", callback_data="*")
         ],
         [
             InlineKeyboardButton("1", callback_data="1"),
             InlineKeyboardButton("2", callback_data="2"),
-            InlineKeyboardButton("3", callback_data="3")
+            InlineKeyboardButton("3", callback_data="3"),
+            InlineKeyboardButton("➖", callback_data="-")
         ],
         [
             InlineKeyboardButton(".", callback_data="."),
             InlineKeyboardButton("0", callback_data="0"),
-            InlineKeyboardButton("=", callback_data="=")
+            InlineKeyboardButton("=", callback_data="="),
+            InlineKeyboardButton("➕", callback_data="+")
         ],
         [
-            InlineKeyboardButton(
-                "🗑 Clear",
-                callback_data="clear"
-            )
+            InlineKeyboardButton("🗑 Clear", callback_data="clear")
         ]
     ]
 )
@@ -163,20 +167,19 @@ calculator_buttons = InlineKeyboardMarkup(
 # =========================================================
 
 @app.on_message(filters.command("start"))
-async def start_command(client, message):
+async def start(client, message):
 
     user_id = message.from_user.id
 
     save_user(user_id)
 
-    joined = await check_force_join(
-        client,
-        user_id
-    )
+    joined = await check_force_join(user_id)
 
-    # ================= FORCE JOIN ================= #
+    # =====================================================
+    # FORCE JOIN SYSTEM
+    # =====================================================
 
-    if joined is False:
+    if not joined:
 
         buttons = InlineKeyboardMarkup(
             [
@@ -195,7 +198,7 @@ async def start_command(client, message):
                 [
                     InlineKeyboardButton(
                         "✅ Verify Join",
-                        callback_data="check_join"
+                        callback_data="verify_join"
                     )
                 ]
             ]
@@ -204,24 +207,34 @@ async def start_command(client, message):
         return await message.reply_photo(
             photo=START_IMAGE,
             caption=(
-                "✨ **Welcome To Prime Calculator Bot**\n\n"
-                "⚠️ To Continue,\n"
-                "Please Join Our Official Channel & Group."
+                "✨ **WELCOME TO PRIME CALCULATOR** ✨\n\n"
+                "⚠️ Access Locked\n"
+                "📢 Join Our Official Channel & Group\n"
+                "✅ Then Click Verify Button\n\n"
+                "🚀 Fast Response\n"
+                "🧮 Advanced Calculator\n"
+                "👥 Group Support\n"
+                "📡 Broadcast System\n\n"
+                "👨‍💻 Developed By @PREMGUPTA2M"
             ),
             reply_markup=buttons
         )
 
-    # ================= MAIN MENU ================= #
+    # =====================================================
+    # MAIN START MESSAGE
+    # =====================================================
 
     await message.reply_photo(
         photo=START_IMAGE,
         caption=(
-            "✨ **Prime Calculator Activated**\n\n"
-            "⚡ Fast Response\n"
-            "🧮 Advanced Calculator\n"
-            "👥 Group Support Enabled\n"
-            "📢 Broadcast System Enabled\n\n"
-            "👇 Use Buttons Below"
+            "✨ **PRIME CALCULATOR ACTIVATED** ✨\n\n"
+            "⚡ Ultra Fast Response\n"
+            "🧮 Professional Calculator\n"
+            "👥 Group Working Enabled\n"
+            "📢 Broadcast System Active\n"
+            "🔒 Secure Force Join System\n\n"
+            "👇 Use Calculator Buttons Below\n\n"
+            "👨‍💻 Developed By @PREMGUPTA2M"
         ),
         reply_markup=calculator_buttons
     )
@@ -230,84 +243,85 @@ async def start_command(client, message):
 # VERIFY JOIN BUTTON
 # =========================================================
 
-@app.on_callback_query(filters.regex("check_join"))
-async def verify_join(client, callback_query):
+@app.on_callback_query(filters.regex("verify_join"))
+async def verify_join(client, query):
 
-    user_id = callback_query.from_user.id
+    user_id = query.from_user.id
 
-    joined = await check_force_join(
-        client,
-        user_id
-    )
+    joined = await check_force_join(user_id)
 
-    if joined is False:
+    if not joined:
 
-        return await callback_query.answer(
-            "❌ Join Channel & Group First",
+        return await query.answer(
+            "❌ First Join Channel & Group",
             show_alert=True
         )
 
-    await callback_query.message.edit_caption(
+    await query.message.edit_caption(
         caption=(
             "✅ **Verification Successful**\n\n"
-            "🧮 Calculator Ready"
+            "🧮 Prime Calculator Ready\n"
+            "⚡ Enjoy Fast Calculator Service\n\n"
+            "👨‍💻 Developed By @PREMGUPTA2M"
         ),
         reply_markup=calculator_buttons
     )
 
 # =========================================================
-# BUTTON CALCULATOR
+# CALLBACK CALCULATOR
 # =========================================================
 
 @app.on_callback_query()
-async def calculator(client, callback_query):
+async def callback_calculator(client, query):
 
-    data = callback_query.data
+    data = query.data
 
-    if data == "check_join":
+    if data == "verify_join":
         return
 
-    user_id = callback_query.from_user.id
+    user_id = query.from_user.id
 
-    if user_id not in user_data:
-        user_data[user_id] = ""
+    if user_id not in calculator_data:
+        calculator_data[user_id] = ""
 
-    expression = user_data[user_id]
+    expression = calculator_data[user_id]
 
-    # ================= CLEAR ================= #
+    # =====================================================
+    # CLEAR
+    # =====================================================
 
     if data == "clear":
 
         expression = ""
 
-    # ================= RESULT ================= #
+    # =====================================================
+    # RESULT
+    # =====================================================
 
     elif data == "=":
 
         try:
-
-            result = f"{eval(expression):,}"
-
-            expression = result
-
+            expression = str(eval(expression))
         except:
-
             expression = "Error"
 
-    # ================= INPUT ================= #
+    # =====================================================
+    # ADD INPUT
+    # =====================================================
 
     else:
-
         expression += data
 
-    user_data[user_id] = expression
+    calculator_data[user_id] = expression
 
     try:
 
-        await callback_query.message.edit_caption(
+        await query.message.edit_caption(
             caption=(
-                "🧮 **Prime Calculator**\n\n"
-                f"`{expression}`"
+                "🧮 **PRIME CALCULATOR**\n\n"
+                f"`{expression}`\n\n"
+                "⚡ Fast Calculation Active\n\n"
+                "👨‍💻 Developed By @PREMGUPTA2M"
             ),
             reply_markup=calculator_buttons
         )
@@ -316,20 +330,26 @@ async def calculator(client, callback_query):
         pass
 
 # =========================================================
-# GROUP & PRIVATE CALCULATOR
+# GROUP CALCULATOR SYSTEM
 # =========================================================
 
 @app.on_message(
     filters.text &
-    (filters.group | filters.private) &
     ~filters.command(
-        ["start", "help", "broadcast", "gcast", "users"]
+        [
+            "start",
+            "broadcast",
+            "gcast",
+            "users",
+            "help"
+        ]
     )
 )
-async def text_calculator(client, message):
+async def auto_calculator(client, message):
 
     try:
 
+        # SAVE GROUP
         if message.chat.type in ["group", "supergroup"]:
             save_group(message.chat.id)
 
@@ -338,112 +358,20 @@ async def text_calculator(client, message):
         allowed = "0123456789+-*/().% "
 
         for char in text:
-
             if char not in allowed:
                 return
 
         result = eval(text)
 
         await message.reply_text(
-            "🧮 **Calculator Result**\n\n"
+            "🧮 **CALCULATION RESULT**\n\n"
             f"📥 Expression : `{text}`\n"
-            f"📤 Result : `{result}`"
+            f"📤 Result : `{result}`\n\n"
+            "⚡ Powered By Prime Calculator"
         )
 
     except:
         pass
-
-# =========================================================
-# PRIVATE BROADCAST
-# =========================================================
-
-@app.on_message(
-    filters.command("broadcast") &
-    filters.user(OWNER_ID)
-)
-async def broadcast_users(client, message):
-
-    if not message.reply_to_message:
-
-        return await message.reply_text(
-            "❌ Reply To Message For Broadcast"
-        )
-
-    with open(USERS_FILE, "r") as file:
-        users = file.read().splitlines()
-
-    success = 0
-    failed = 0
-
-    status = await message.reply_text(
-        "📢 Broadcasting To Users..."
-    )
-
-    for user in users:
-
-        try:
-
-            await message.reply_to_message.copy(
-                int(user)
-            )
-
-            success += 1
-
-        except:
-
-            failed += 1
-
-    await status.edit_text(
-        "✅ User Broadcast Completed\n\n"
-        f"✔ Success : {success}\n"
-        f"❌ Failed : {failed}"
-    )
-
-# =========================================================
-# GROUP BROADCAST
-# =========================================================
-
-@app.on_message(
-    filters.command("gcast") &
-    filters.user(OWNER_ID)
-)
-async def broadcast_groups(client, message):
-
-    if not message.reply_to_message:
-
-        return await message.reply_text(
-            "❌ Reply To Message For Group Broadcast"
-        )
-
-    with open(GROUPS_FILE, "r") as file:
-        groups = file.read().splitlines()
-
-    success = 0
-    failed = 0
-
-    status = await message.reply_text(
-        "📢 Broadcasting To Groups..."
-    )
-
-    for group in groups:
-
-        try:
-
-            await message.reply_to_message.copy(
-                int(group)
-            )
-
-            success += 1
-
-        except:
-
-            failed += 1
-
-    await status.edit_text(
-        "✅ Group Broadcast Completed\n\n"
-        f"✔ Success : {success}\n"
-        f"❌ Failed : {failed}"
-    )
 
 # =========================================================
 # TOTAL USERS
@@ -455,16 +383,110 @@ async def broadcast_groups(client, message):
 )
 async def total_users(client, message):
 
-    with open(USERS_FILE, "r") as file:
-        users = file.read().splitlines()
+    with open(USERS_FILE, "r") as f:
+        users = f.read().splitlines()
 
-    with open(GROUPS_FILE, "r") as file:
-        groups = file.read().splitlines()
+    with open(GROUPS_FILE, "r") as f:
+        groups = f.read().splitlines()
 
     await message.reply_text(
-        "📊 **Prime Calculator Stats**\n\n"
-        f"👤 Users : {len(users)}\n"
-        f"👥 Groups : {len(groups)}"
+        "📊 **PRIME CALCULATOR STATS**\n\n"
+        f"👤 Total Users : `{len(users)}`\n"
+        f"👥 Total Groups : `{len(groups)}`\n\n"
+        "👨‍💻 Developed By @PREMGUPTA2M"
+    )
+
+# =========================================================
+# USER BROADCAST
+# =========================================================
+
+@app.on_message(
+    filters.command("broadcast") &
+    filters.user(OWNER_ID)
+)
+async def broadcast_users(client, message):
+
+    if not message.reply_to_message:
+
+        return await message.reply_text(
+            "❌ Reply To Any Message"
+        )
+
+    with open(USERS_FILE, "r") as f:
+        users = f.read().splitlines()
+
+    sent = 0
+    failed = 0
+
+    msg = await message.reply_text(
+        "📢 Broadcasting To Users..."
+    )
+
+    for user in users:
+
+        try:
+
+            await message.reply_to_message.copy(
+                int(user)
+            )
+
+            sent += 1
+
+        except:
+            failed += 1
+
+    await msg.edit_text(
+        "✅ USER BROADCAST COMPLETED\n\n"
+        f"✔ Sent : `{sent}`\n"
+        f"❌ Failed : `{failed}`"
+    )
+
+# =========================================================
+# GROUP BROADCAST
+# =========================================================
+
+@app.on_message(
+    filters.command("gcast") &
+    filters.user(OWNER_ID)
+)
+async def group_broadcast(client, message):
+
+    if not message.reply_to_message:
+
+        return await message.reply_text(
+            "❌ Reply To Any Message"
+        )
+
+    with open(GROUPS_FILE, "r") as f:
+        groups = f.read().splitlines()
+
+    sent = 0
+    failed = 0
+
+    msg = await message.reply_text(
+        "📢 Broadcasting To Groups..."
+    )
+
+    for group in groups:
+
+        try:
+
+            await message.reply_to_message.copy(
+                int(group)
+            )
+
+            sent += 1
+
+        except Exception as e:
+
+            print(e)
+
+            failed += 1
+
+    await msg.edit_text(
+        "✅ GROUP BROADCAST COMPLETED\n\n"
+        f"✔ Sent : `{sent}`\n"
+        f"❌ Failed : `{failed}`"
     )
 
 # =========================================================
@@ -475,22 +497,22 @@ async def total_users(client, message):
 async def help_command(client, message):
 
     await message.reply_text(
-        "📚 **Prime Calculator Commands**\n\n"
-        "/start - Start Bot\n"
-        "/help - Help Menu\n"
-        "/users - Bot Stats\n"
-        "/broadcast - User Broadcast\n"
-        "/gcast - Group Broadcast\n\n"
-        "🧮 Send Any Math Expression:\n"
+        "📚 **PRIME CALCULATOR HELP MENU**\n\n"
+        "🧮 Send Any Math Expression\n"
         "`5+5`\n"
         "`100/2`\n"
-        "`9*9`"
+        "`9*9`\n\n"
+        "📢 Owner Commands:\n"
+        "/users\n"
+        "/broadcast\n"
+        "/gcast\n\n"
+        "👨‍💻 Developed By @PREMGUPTA2M"
     )
 
 # =========================================================
-# BOT START
+# BOT STARTED
 # =========================================================
 
-print("Prime Calculator Bot Started Successfully")
+print("✅ Prime Calculator Bot Started")
 
 app.run()
