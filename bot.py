@@ -23,20 +23,24 @@ from pyrogram.types import (
 from config import *
 
 # =========================================================
-# WEB SERVER FOR RENDER
+# WEB SERVER
 # =========================================================
+
+from flask import Flask
+from threading import Thread
+import os
 
 web = Flask(__name__)
 
 @web.route("/")
 def home():
-    return "Prime Calculator Bot Running Successfully"
+    return "OK"
 
-def run_web():
+def run():
     port = int(os.environ.get("PORT", 10000))
     web.run(host="0.0.0.0", port=port)
 
-Thread(target=run_web, daemon=True).start()
+Thread(target=run, daemon=True).start()
 
 # =========================================================
 # BOT CLIENT
