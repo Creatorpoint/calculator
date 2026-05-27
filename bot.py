@@ -1,3 +1,18 @@
+from flask import Flask
+from threading import Thread
+import os
+
+web_app = Flask(__name__)
+
+@web_app.route("/")
+def home():
+    return "Bot Running Successfully"
+
+def run_web():
+    port = int(os.environ.get("PORT", 10000))
+    web_app.run(host="0.0.0.0", port=port)
+
+Thread(target=run_web).start()
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from config import *
