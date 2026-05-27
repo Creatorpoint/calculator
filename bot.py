@@ -79,46 +79,46 @@ async def start_command(client, message):
     START_IMAGE = "https://files.catbox.moe/splh4m.jpg"
 
     if not joined:
-    buttons = InlineKeyboardMarkup(
-        [
+        buttons = InlineKeyboardMarkup(
             [
-                InlineKeyboardButton(
-                    "📢 Join Channel",
-                    url=f"https://t.me/{FORCE_CHANNEL.replace('@', '')}"
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    "👥 Join Group",
-                    url=f"https://t.me/{FORCE_GROUP.replace('@', '')}"
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    "✅ Check Join",
-                    callback_data="check_join"
-                )
+                [
+                    InlineKeyboardButton(
+                        "📢 Join Channel",
+                        url=f"https://t.me/{FORCE_CHANNEL.replace('@', '')}"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        "👥 Join Group",
+                        url=f"https://t.me/{FORCE_GROUP.replace('@', '')}"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        "✅ Check Join",
+                        callback_data="check_join"
+                    )
+                ]
             ]
-        ]
-    )
+        )
 
-    return await message.reply_photo(
+        return await message.reply_photo(
+            photo=START_IMAGE,
+            caption=(
+                "✨ Welcome To Professional Calculator Bot\n\n"
+                "⚠️ To Use This Bot Please Join Our Official Channel & Group First."
+            ),
+            reply_markup=buttons
+        )
+
+    await message.reply_photo(
         photo=START_IMAGE,
         caption=(
-            "✨ Welcome To Professional Calculator Bot\n\n"
-            "⚠️ To Use This Bot Please Join Our Official Channel & Group First."
+            "✨ Professional Calculator Bot Ready\n\n"
+            "Use The Buttons Below 👇"
         ),
-        reply_markup=buttons
+        reply_markup=calculator_buttons
     )
-    await message.reply_photo(
-    photo=START_IMAGE,
-    caption=(
-        "✨ Prime Calculator Bot Ready\n\n"
-        "Use The Buttons Below 👇"
-    ),
-    reply_markup=calculator_buttons
-)
-
 @app.on_callback_query(filters.regex("check_join"))
 async def check_join_callback(client, callback_query):
     user_id = callback_query.from_user.id
